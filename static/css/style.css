@@ -1,0 +1,285 @@
+/* Global & Dark Theme Variables */
+:root {
+    --bg-dark: #0f172a;
+    --card-glass: rgba(30, 41, 59, 0.7);
+    --border-glass: rgba(255, 255, 255, 0.1);
+    --text-primary: #f8fafc;
+    --accent-primary: #3b82f6;
+    --accent-glow: rgba(59, 130, 246, 0.5);
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+}
+
+body.dark-theme {
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* Background animated blobs for modern feel */
+.bg-shape {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(100px);
+    z-index: -1;
+    opacity: 0.5;
+    animation: float 20s infinite alternate;
+}
+.shape-1 {
+    width: 400px;
+    height: 400px;
+    background: rgba(59, 130, 246, 0.3);
+    top: -100px;
+    left: -100px;
+}
+.shape-2 {
+    width: 500px;
+    height: 500px;
+    background: rgba(139, 92, 246, 0.2);
+    bottom: -150px;
+    right: -100px;
+    animation-delay: -5s;
+}
+
+@keyframes float {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(50px, 50px) scale(1.1); }
+}
+
+/* Glassmorphism Classes */
+.glass-nav {
+    background: rgba(15, 23, 42, 0.8) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.glass-card {
+    background: var(--card-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Network Container (Vis.js) */
+.network-container {
+    width: 100%;
+    height: 400px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.2);
+    border: 1px inset rgba(255,255,255,0.05);
+}
+
+.stat-card {
+    min-height: 92px;
+    padding: 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.stat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 1.35rem;
+}
+
+.stat-label {
+    color: rgba(248, 250, 252, 0.62);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+
+.stat-value {
+    color: var(--text-primary);
+    font-size: 1.65rem;
+    line-height: 1.1;
+    font-weight: 800;
+}
+
+.metric-progress {
+    min-width: 130px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.metric-progress span {
+    width: 38px;
+    flex: 0 0 38px;
+    text-align: right;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.metric-tile {
+    min-height: 72px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid var(--border-glass);
+}
+
+.metric-tile span {
+    display: block;
+    color: rgba(248, 250, 252, 0.62);
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+}
+
+.metric-tile strong {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.metric-tile-wide strong {
+    font-size: 0.92rem;
+}
+
+/* Custom UI Elements */
+.btn-glow {
+    box-shadow: 0 0 15px var(--accent-glow);
+    transition: all 0.3s;
+}
+.btn-glow:hover {
+    box-shadow: 0 0 25px var(--accent-glow);
+    transform: translateY(-2px);
+}
+
+.custom-range::-webkit-slider-thumb {
+    background: var(--accent-primary);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Custom Table */
+.custom-table {
+    background: transparent;
+    color: var(--text-primary);
+}
+.custom-table tbody tr {
+    transition: background 0.2s;
+}
+.custom-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.custom-table td, .custom-table th {
+    border-bottom-color: var(--border-glass);
+}
+
+/* Progress bars */
+.progress-dark {
+    background-color: rgba(255, 255, 255, 0.1);
+    height: 8px;
+    border-radius: 4px;
+}
+.progress-bar-animated {
+    transition: width 1s ease-in-out, background-color 0.5s;
+}
+
+/* Animations for Edges in Vis.js are handled via canvas, but we can style the tooltip */
+div.vis-tooltip {
+    background-color: rgba(15, 23, 42, 0.9) !important;
+    border: 1px solid var(--border-glass) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* Status indicator pulse */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+.status-good { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.status-warn { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+.status-crit { background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: pulse 1s infinite; }
+.status-warning { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+.status-critical { background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: pulse 1s infinite; }
+
+.alert-list {
+    display: grid;
+    gap: 10px;
+    max-height: 460px;
+    overflow: auto;
+    padding-right: 2px;
+}
+
+.alert-item {
+    border-radius: 8px;
+    padding: 12px;
+    background: rgba(15, 23, 42, 0.42);
+    border: 1px solid var(--border-glass);
+}
+
+.alert-warning {
+    border-left: 4px solid var(--warning);
+}
+
+.alert-critical {
+    border-left: 4px solid var(--danger);
+}
+
+.empty-state {
+    min-height: 180px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 10px;
+    color: rgba(248, 250, 252, 0.55);
+    text-align: center;
+}
+
+.empty-state i {
+    font-size: 2rem;
+    color: var(--success);
+}
+
+code {
+    color: #93c5fd;
+    white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+    .metric-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-progress {
+        min-width: 110px;
+    }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}

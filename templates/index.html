@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNMPSim Monitoring Lab</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://unpkg.com/vis-network/standalone/umd/vis-network.min.css" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme">
+    <div class="bg-shape shape-1"></div>
+    <div class="bg-shape shape-2"></div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark glass-nav mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="bi bi-router text-primary"></i> SNMPSim Monitoring Lab
+            </a>
+            <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end">
+                <span id="sim-status">
+                    <span class="badge bg-secondary">Checking Status...</span>
+                </span>
+                <button class="btn btn-success btn-sm fw-bold" id="btn-start" onclick="startSim()">
+                    <i class="bi bi-play-fill"></i> Start
+                </button>
+                <button class="btn btn-danger btn-sm fw-bold" id="btn-stop" onclick="stopSim()">
+                    <i class="bi bi-stop-fill"></i> Stop
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 pb-4">
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-xl-3">
+                <div class="glass-card stat-card">
+                    <div class="stat-icon text-primary"><i class="bi bi-hdd-network"></i></div>
+                    <div>
+                        <div class="stat-label">Devices</div>
+                        <div class="stat-value" id="summary-devices">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="glass-card stat-card">
+                    <div class="stat-icon text-success"><i class="bi bi-check-circle"></i></div>
+                    <div>
+                        <div class="stat-label">Healthy</div>
+                        <div class="stat-value" id="summary-good">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="glass-card stat-card">
+                    <div class="stat-icon text-warning"><i class="bi bi-exclamation-triangle"></i></div>
+                    <div>
+                        <div class="stat-label">Warnings</div>
+                        <div class="stat-value" id="summary-warning">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="glass-card stat-card">
+                    <div class="stat-icon text-danger"><i class="bi bi-fire"></i></div>
+                    <div>
+                        <div class="stat-label">Critical</div>
+                        <div class="stat-value" id="summary-critical">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="glass-card h-100 p-3 position-relative">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h5 class="card-title fw-bold text-white mb-0">
+                            <i class="bi bi-diagram-3"></i> Network Topology
+                        </h5>
+                        <span class="badge bg-dark border" id="summary-alerts">0 active alerts</span>
+                    </div>
+                    <div id="network-container" class="network-container"></div>
+                    <div id="polling-indicator" class="position-absolute top-0 end-0 m-3 text-white-50" style="display: none;">
+                        <span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
+                        <small>Syncing...</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="glass-card h-100 p-4">
+                    <h5 class="card-title fw-bold text-white mb-4"><i class="bi bi-sliders"></i> Device Control</h5>
+
+                    <div id="device-placeholder" class="text-center text-white-50 py-5">
+                        <i class="bi bi-mouse3 display-4 mb-3"></i>
+                        <p>Select a topology node to inspect and change simulated SNMP values.</p>
+                    </div>
+
+                    <div id="device-editor" style="display: none;">
+                        <h4 id="edit-name" class="text-primary fw-bold mb-1">Device Name</h4>
+                        <p class="text-muted small mb-4">SNMP file: <span id="edit-id"></span></p>
+
+                        <form id="update-form">
+                            <input type="hidden" id="edit-filename">
+
+                            <div class="mb-4">
+                                <label for="edit-cpu" class="form-label text-white fw-semibold d-flex justify-content-between">
+                                    <span>CPU Usage</span>
+                                    <span id="cpu-val-display" class="text-warning">0%</span>
+                                </label>
+                                <input type="range" class="form-range custom-range" id="edit-cpu" min="0" max="100" oninput="updateRangeLabel('cpu')">
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="edit-ram" class="form-label text-white fw-semibold d-flex justify-content-between">
+                                    <span>RAM Usage</span>
+                                    <span id="ram-val-display" class="text-info">0%</span>
+                                </label>
+                                <input type="range" class="form-range custom-range" id="edit-ram" min="0" max="100" oninput="updateRangeLabel('ram')">
+                                <div class="text-end mt-1">
+                                    <small id="ram-details" class="text-muted">Total: N/A</small>
+                                </div>
+                            </div>
+
+                            <div id="selected-device-metrics" class="metric-grid mb-4"></div>
+
+                            <div class="d-grid gap-2 mt-4">
+                                <button type="button" class="btn btn-primary btn-glow" onclick="saveDeviceConfig(false)">
+                                    <i class="bi bi-exclamation-triangle"></i> Force High Load
+                                </button>
+                                <button type="button" class="btn btn-outline-success" onclick="saveDeviceConfig(true)">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Reset to Normal
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+            <div class="col-xl-8">
+                <div class="glass-card p-4 h-100">
+                    <h5 class="card-title fw-bold text-white mb-3">
+                        <i class="bi bi-list-columns-reverse"></i> Real-time SNMP Metrics
+                    </h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover table-borderless align-middle custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Device</th>
+                                    <th>CPU</th>
+                                    <th>RAM</th>
+                                    <th>Disk</th>
+                                    <th>Sessions</th>
+                                    <th>Load</th>
+                                    <th>Interfaces</th>
+                                    <th>Traffic Counters</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="device-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="glass-card p-4 h-100">
+                    <h5 class="card-title fw-bold text-white mb-3">
+                        <i class="bi bi-bell"></i> Active Threshold Alerts
+                    </h5>
+                    <div id="alert-list" class="alert-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="glass-card p-4">
+                    <h5 class="card-title fw-bold text-white mb-3">
+                        <i class="bi bi-clipboard2-pulse"></i> SNMP Monitoring Scope
+                    </h5>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-borderless align-middle custom-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>SNMP OID</th>
+                                    <th>Warning</th>
+                                    <th>Critical</th>
+                                    <th>Purpose</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rules-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
