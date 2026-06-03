@@ -6,4 +6,4 @@ venv/
 env/
 .env
 *.tmp
-
+node_modules/

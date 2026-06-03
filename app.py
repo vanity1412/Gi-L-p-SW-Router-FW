@@ -201,7 +201,11 @@ def api_update_device():
     if os.path.basename(filename) != filename or not filename.endswith('.snmprec'):
         return jsonify({'status': 'error', 'message': 'Invalid SNMP record filename'}), 400
 
-    success = update_device(filename, new_cpu=cpu, new_ram=ram, reset_normal=reset_normal)
+    try:
+        success = update_device(filename, new_cpu=cpu, new_ram=ram, reset_normal=reset_normal)
+    except Exception as exc:
+        return jsonify({'status': 'error', 'message': f'Update failed: {exc}'}), 500
+
     if success:
         return jsonify({'status': 'success', 'message': f'Updated {filename}'})
 

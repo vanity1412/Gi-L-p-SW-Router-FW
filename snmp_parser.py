@@ -2,6 +2,7 @@ import glob
 import os
 import random
 import threading
+import time
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'data')
@@ -105,9 +106,32 @@ def _read_snmprec_lines(filepath):
 
 def _write_snmprec_lines(filepath, lines):
     tmp_path = f'{filepath}.tmp'
-    with open(tmp_path, 'w', encoding='utf-8', newline='') as file:
-        file.writelines(lines)
-    os.replace(tmp_path, filepath)
+    last_error = None
+
+    for _ in range(8):
+        try:
+            with open(tmp_path, 'w', encoding='utf-8', newline='') as file:
+                file.writelines(lines)
+            os.replace(tmp_path, filepath)
+            return
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.15)
+
+    # Windows can reject os.replace() while SNMPSim/PRTG is reading the
+    # record. Direct overwrite is less atomic but keeps the lab UI usable.
+    try:
+        with open(filepath, 'w', encoding='utf-8', newline='') as file:
+            file.writelines(lines)
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+
+    if last_error and not os.path.exists(filepath):
+        raise last_error
 
 
 def _resolve_device_path(filename):
