@@ -323,6 +323,10 @@ def find_snmpsim_executable():
 
     candidates = [
         local_candidate,
+        os.path.join(BASE_DIR, 'venv', 'Scripts', 'snmpsim-command-responder.exe'),
+        os.path.join(BASE_DIR, '.venv', 'Scripts', 'snmpsim-command-responder.exe'),
+        os.path.join(BASE_DIR, 'venv', 'bin', 'snmpsim-command-responder'),
+        os.path.join(BASE_DIR, '.venv', 'bin', 'snmpsim-command-responder'),
         shutil.which('snmpsim-command-responder'),
         'snmpsim-command-responder',
     ]
@@ -380,7 +384,10 @@ def start_snmpsim_process():
                 )
         except FileNotFoundError:
             snmpsim_process = None
-            return False, 'snmpsim-command-responder was not found. Run: pip install -r requirements.txt', None
+            return False, (
+                'snmpsim-command-responder was not found. '
+                'Run: venv\\Scripts\\python.exe -m pip install -r requirements.txt'
+            ), None
         except Exception as exc:
             snmpsim_process = None
             return False, str(exc), None

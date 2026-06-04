@@ -24,12 +24,20 @@ if %errorlevel% neq 0 (
 )
 echo.
 
-echo 2. Installing Python requirements...
-pip install -r requirements.txt
+echo 2. Preparing Python virtual environment...
+if not exist venv\Scripts\python.exe (
+    python -m venv venv
+    if %errorlevel% neq 0 (
+        echo [ERROR] Could not create Python virtual environment.
+        pause
+        exit /b 1
+    )
+)
+venv\Scripts\python.exe -m pip install -r requirements.txt
 echo.
 
 echo 3. Starting Flask Backend Dashboard...
 echo [INFO] Access the dashboard at http://localhost:5000
 echo.
-python app.py
+venv\Scripts\python.exe app.py
 pause
