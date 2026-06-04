@@ -7,3 +7,5 @@ env/
 .env
 *.tmp
 node_modules/
+data/incidents.json
+data/services.json

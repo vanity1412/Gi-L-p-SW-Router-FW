@@ -19,6 +19,9 @@ OIDS = {
     'ucd_cpu': '1.3.6.1.4.1.2021.11.9.0',
     'ucd_ram_total': '1.3.6.1.4.1.2021.4.5.0',
     'ucd_ram_avail': '1.3.6.1.4.1.2021.4.6.0',
+    'ucd_swap_total': '1.3.6.1.4.1.2021.4.3.0',
+    'ucd_swap_avail': '1.3.6.1.4.1.2021.4.4.0',
+    'ucd_disk_percent': '1.3.6.1.4.1.2021.9.1.9.1',
 }
 
 IF_NAME_PREFIX = '1.3.6.1.2.1.2.2.1.1.'
@@ -45,7 +48,7 @@ MONITORING_RULES = [
     },
     {
         'metric': 'Disk usage',
-        'oid': OIDS['fortinet_disk'],
+        'oid': f"{OIDS['fortinet_disk']} or {OIDS['ucd_disk_percent']}",
         'warning': '>= 80%',
         'critical': '>= 90%',
         'meaning': 'Firewall disk usage is high.',
@@ -77,6 +80,13 @@ MONITORING_RULES = [
         'warning': 'rate is calculated by external monitoring tools',
         'critical': 'rate is calculated by external monitoring tools',
         'meaning': 'Counters are exposed for Cacti/Nagios/Zabbix/PRTG polling.',
+    },
+    {
+        'metric': 'Service state',
+        'oid': 'Lab state service monitor',
+        'warning': 'restarting/unknown',
+        'critical': 'stopped/failed',
+        'meaning': 'Demo service health for remediation workflows.',
     },
 ]
 
@@ -265,6 +275,9 @@ def parse_device_file(filepath):
         'ram_total': 0,
         'ram_avail': 0,
         'ram_percent': 0,
+        'swap_total': 0,
+        'swap_avail': 0,
+        'swap_percent': 0,
         'disk_percent': 0,
         'sessions': 0,
         'load_avg': [],
@@ -314,6 +327,12 @@ def parse_device_file(filepath):
             data['ram_total'] = _parse_int(value)
         elif oid == OIDS['ucd_ram_avail']:
             data['ram_avail'] = _parse_int(value)
+        elif oid == OIDS['ucd_swap_total']:
+            data['swap_total'] = _parse_int(value)
+        elif oid == OIDS['ucd_swap_avail']:
+            data['swap_avail'] = _parse_int(value)
+        elif oid == OIDS['ucd_disk_percent']:
+            data['disk_percent'] = _parse_int(value)
 
         index = _extract_index(oid, IF_NAME_PREFIX)
         if index is not None and not value.isdigit():
@@ -346,6 +365,10 @@ def parse_device_file(filepath):
     elif data['ram_total'] > 0:
         used = max(0, data['ram_total'] - data['ram_avail'])
         data['ram_percent'] = int((used / data['ram_total']) * 100)
+
+    if data['swap_total'] > 0:
+        swap_used = max(0, data['swap_total'] - data['swap_avail'])
+        data['swap_percent'] = int((swap_used / data['swap_total']) * 100)
 
     data['interfaces'] = sorted(
         interfaces.values(),
@@ -393,7 +416,17 @@ def build_monitoring_summary(devices):
     }
 
 
-def update_device(filename, new_cpu=None, new_ram=None, reset_normal=False):
+def update_device(
+    filename,
+    new_cpu=None,
+    new_ram=None,
+    new_disk=None,
+    new_sessions=None,
+    new_load=None,
+    interface_index=None,
+    interface_status=None,
+    reset_normal=False,
+):
     filepath = _resolve_device_path(filename)
     if not filepath or not os.path.exists(filepath):
         return False
@@ -401,21 +434,43 @@ def update_device(filename, new_cpu=None, new_ram=None, reset_normal=False):
     if reset_normal:
         new_cpu = random.randint(10, 30)
         new_ram = random.randint(20, 40)
+        new_disk = random.randint(25, 55) if new_disk is None else new_disk
+        new_sessions = random.randint(500, 2500) if new_sessions is None else new_sessions
+        new_load = random.randint(1, 3) if new_load is None else new_load
+        interface_status = 1 if interface_index is not None else interface_status
     else:
         if new_cpu is not None:
             new_cpu = _clamp_percent(new_cpu)
         if new_ram is not None:
             new_ram = _clamp_percent(new_ram)
+        if new_disk is not None:
+            new_disk = _clamp_percent(new_disk)
+        if new_sessions is not None:
+            new_sessions = max(0, _parse_int(new_sessions))
+        if new_load is not None:
+            new_load = max(0, _parse_float(new_load))
+        if interface_status is not None:
+            interface_status = 1 if _parse_int(interface_status) == 1 else 2
 
     with _LOCK:
         lines = _read_snmprec_lines(filepath)
 
         ram_total = 0
+        swap_total = 0
+        found_disk_line = False
+        found_sessions_line = False
+        found_load_line = False
+        found_interface_line = False
+
         for line in lines:
             if line.startswith(OIDS['ucd_ram_total']):
                 parts = line.strip().split('|')
                 if len(parts) >= 3:
                     ram_total = _parse_int(parts[2])
+            elif line.startswith(OIDS['ucd_swap_total']):
+                parts = line.strip().split('|')
+                if len(parts) >= 3:
+                    swap_total = _parse_int(parts[2])
 
         for index, line in enumerate(lines):
             stripped = line.strip()
@@ -440,6 +495,53 @@ def update_device(filename, new_cpu=None, new_ram=None, reset_normal=False):
                     avail = int(ram_total - (ram_total * new_ram / 100))
                     parts[2] = str(max(0, avail))
                     lines[index] = '|'.join(parts) + '\n'
+
+            if new_disk is not None and oid in (OIDS['fortinet_disk'], OIDS['ucd_disk_percent']):
+                found_disk_line = True
+                parts[2] = str(new_disk)
+                lines[index] = '|'.join(parts) + '\n'
+
+            if new_sessions is not None and oid == OIDS['fortinet_sessions']:
+                found_sessions_line = True
+                parts[2] = str(new_sessions)
+                lines[index] = '|'.join(parts) + '\n'
+
+            if new_load is not None and oid.startswith(LOAD_AVG_PREFIX):
+                found_load_line = True
+                load_index = _parse_int(_extract_index(oid, LOAD_AVG_PREFIX), 1)
+                load_value = max(0, new_load - ((load_index - 1) * 0.8))
+                parts[2] = f'{load_value:.1f}'.rstrip('0').rstrip('.')
+                lines[index] = '|'.join(parts) + '\n'
+
+            if interface_index is not None and interface_status is not None:
+                target_suffix = str(interface_index)
+                if oid in (
+                    f'{IF_ADMIN_STATUS_PREFIX}{target_suffix}',
+                    f'{IF_OPER_STATUS_PREFIX}{target_suffix}',
+                ):
+                    found_interface_line = True
+                    parts[2] = str(interface_status)
+                    lines[index] = '|'.join(parts) + '\n'
+
+            if swap_total > 0 and new_ram is not None and oid == OIDS['ucd_swap_avail']:
+                swap_used_percent = 45 if new_ram >= 90 else 10
+                avail = int(swap_total - (swap_total * swap_used_percent / 100))
+                parts[2] = str(max(0, avail))
+                lines[index] = '|'.join(parts) + '\n'
+
+        if new_disk is not None and not found_disk_line:
+            lines.append(f"{OIDS['ucd_disk_percent']}|2|{new_disk}\n")
+
+        if new_load is not None and not found_load_line:
+            for load_index in range(1, 4):
+                load_value = max(0, new_load - ((load_index - 1) * 0.8))
+                lines.append(f"{LOAD_AVG_PREFIX}{load_index}|2|{load_value:.1f}".rstrip('0').rstrip('.') + '\n')
+
+        if interface_index is not None and interface_status is not None and not found_interface_line:
+            lines.append(f'{IF_OPER_STATUS_PREFIX}{interface_index}|2|{interface_status}\n')
+
+        if new_sessions is not None and not found_sessions_line and 'fortinet' in filename.lower():
+            lines.append(f"{OIDS['fortinet_sessions']}|2|{new_sessions}\n")
 
         _write_snmprec_lines(filepath, lines)
 
@@ -499,7 +601,7 @@ def simulate_traffic():
                     parts[2] = str(get_fluctuated_value(value))
                     lines[index] = '|'.join(parts) + '\n'
 
-                elif oid == OIDS['fortinet_disk']:
+                elif oid in (OIDS['fortinet_disk'], OIDS['ucd_disk_percent']):
                     parts[2] = str(get_fluctuated_value(value))
                     lines[index] = '|'.join(parts) + '\n'
 
