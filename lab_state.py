@@ -3,12 +3,31 @@ import os
 import threading
 from datetime import datetime
 
-from snmp_parser import DATA_DIR
+from snmp_parser import (
+    DATA_DIR,
+    LAB_SERVICE_COUNT_OID,
+    LAB_SERVICE_CRITICAL_PREFIX,
+    LAB_SERVICE_LABEL_PREFIX,
+    LAB_SERVICE_NAME_PREFIX,
+    LAB_SERVICE_PORT_PREFIX,
+    LAB_SERVICE_STATE_PREFIX,
+    upsert_snmprec_values,
+)
 
 _LOCK = threading.RLock()
 
 SERVICES_PATH = os.path.join(DATA_DIR, 'services.json')
 INCIDENTS_PATH = os.path.join(DATA_DIR, 'incidents.json')
+
+SERVICE_STATUS_VALUES = {
+    'unknown': 0,
+    'running': 1,
+    'stopped': 2,
+    'failed': 3,
+    'restarting': 4,
+}
+
+SERVICE_STATUS_TEXT = '0=unknown, 1=running, 2=stopped, 3=failed, 4=restarting'
 
 DEFAULT_SERVICES = {
     'ubuntu': [
@@ -73,6 +92,43 @@ def _service_key(service):
     return service.get('name')
 
 
+def _service_status_value(status):
+    return SERVICE_STATUS_VALUES.get(status, SERVICE_STATUS_VALUES['unknown'])
+
+
+def _service_state_oid(index):
+    return f'{LAB_SERVICE_STATE_PREFIX}.{index}.0'
+
+
+def _service_name_oid(index):
+    return f'{LAB_SERVICE_NAME_PREFIX}.{index}.0'
+
+
+def _service_label_oid(index):
+    return f'{LAB_SERVICE_LABEL_PREFIX}.{index}.0'
+
+
+def _service_port_oid(index):
+    return f'{LAB_SERVICE_PORT_PREFIX}.{index}.0'
+
+
+def _service_critical_oid(index):
+    return f'{LAB_SERVICE_CRITICAL_PREFIX}.{index}.0'
+
+
+def _decorate_service_oids(services):
+    for index, service in enumerate(services, start=1):
+        service['index'] = index
+        service['state_value'] = _service_status_value(service.get('status'))
+        service['state_oid'] = _service_state_oid(index)
+        service['name_oid'] = _service_name_oid(index)
+        service['label_oid'] = _service_label_oid(index)
+        service['port_oid'] = _service_port_oid(index)
+        service['critical_oid'] = _service_critical_oid(index)
+        service['state_value_map'] = SERVICE_STATUS_TEXT
+    return services
+
+
 def _merge_services(existing, devices=None):
     merged = {}
 
@@ -95,7 +151,38 @@ def _merge_services(existing, devices=None):
         if device_id and device_id not in merged:
             merged[device_id] = [_default_service(device_id)]
 
+    for device_id, services in merged.items():
+        merged[device_id] = _decorate_service_oids(services)
+
     return merged
+
+
+def _service_snmp_values(services):
+    values = [{'oid': LAB_SERVICE_COUNT_OID, 'type': 2, 'value': len(services)}]
+
+    for service in services:
+        index = service.get('index')
+        name = service.get('name') or f'service-{index}'
+        port = service.get('port') or 0
+        values.extend([
+            {'oid': service['state_oid'], 'type': 2, 'value': _service_status_value(service.get('status'))},
+            {'oid': service['name_oid'], 'type': 4, 'value': name},
+            {'oid': service['label_oid'], 'type': 4, 'value': service.get('label') or name},
+            {'oid': service['port_oid'], 'type': 2, 'value': port},
+            {'oid': service['critical_oid'], 'type': 2, 'value': 1 if service.get('critical') else 0},
+        ])
+
+    return values
+
+
+def sync_services_to_snmprec(services_by_device):
+    for device_id, services in (services_by_device or {}).items():
+        filename = f'{device_id}.snmprec'
+        upsert_snmprec_values(
+            filename,
+            _service_snmp_values(services),
+            marker_comment='Lab service-state OIDs for Zabbix. State: 0 unknown, 1 running, 2 stopped, 3 failed, 4 restarting',
+        )
 
 
 def get_services(devices=None):
@@ -118,7 +205,9 @@ def set_service_status(device_id, service_name, status):
             if service.get('name') == service_name:
                 service['status'] = status
                 service['updated_at'] = _now()
+                services[device_id] = _decorate_service_oids(services[device_id])
                 _write_json(SERVICES_PATH, services)
+                sync_services_to_snmprec({device_id: services[device_id]})
                 return True
 
         services[device_id].append({
@@ -129,7 +218,9 @@ def set_service_status(device_id, service_name, status):
             'critical': True,
             'updated_at': _now(),
         })
+        services[device_id] = _decorate_service_oids(services[device_id])
         _write_json(SERVICES_PATH, services)
+        sync_services_to_snmprec({device_id: services[device_id]})
         return True
 
 
@@ -141,7 +232,9 @@ def reset_services(device_id=None):
             for service in services.get(current_device_id, []):
                 service['status'] = 'running'
                 service['updated_at'] = _now()
+            services[current_device_id] = _decorate_service_oids(services.get(current_device_id, []))
         _write_json(SERVICES_PATH, services)
+        sync_services_to_snmprec({current_device_id: services.get(current_device_id, []) for current_device_id in device_ids})
         return services
 
 

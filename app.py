@@ -18,6 +18,7 @@ from lab_state import (
     reset_services,
     set_service_status,
     start_action,
+    sync_services_to_snmprec,
     sync_incidents,
 )
 from snmp_parser import (
@@ -370,6 +371,7 @@ def start_snmpsim_process():
             return True, 'SNMPSim is already running', snmpsim_process.pid
 
         os.makedirs(DATA_DIR, exist_ok=True)
+        sync_services_to_snmprec(get_services(get_all_devices()))
         command = snmpsim_command()
         creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 
@@ -624,6 +626,7 @@ def cleanup_snmpsim_process():
 
 if __name__ == '__main__':
     os.makedirs(DATA_DIR, exist_ok=True)
+    sync_services_to_snmprec(get_services(get_all_devices()))
 
     if SIMULATION_ENABLED:
         sim_thread = threading.Thread(target=simulation_loop, daemon=True)

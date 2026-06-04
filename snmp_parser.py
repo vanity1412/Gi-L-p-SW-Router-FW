@@ -24,6 +24,14 @@ OIDS = {
     'ucd_disk_percent': '1.3.6.1.4.1.2021.9.1.9.1',
 }
 
+LAB_SERVICE_OID_BASE = '1.3.6.1.4.1.99999.1'
+LAB_SERVICE_COUNT_OID = f'{LAB_SERVICE_OID_BASE}.0'
+LAB_SERVICE_STATE_PREFIX = f'{LAB_SERVICE_OID_BASE}.1'
+LAB_SERVICE_NAME_PREFIX = f'{LAB_SERVICE_OID_BASE}.2'
+LAB_SERVICE_LABEL_PREFIX = f'{LAB_SERVICE_OID_BASE}.3'
+LAB_SERVICE_PORT_PREFIX = f'{LAB_SERVICE_OID_BASE}.4'
+LAB_SERVICE_CRITICAL_PREFIX = f'{LAB_SERVICE_OID_BASE}.5'
+
 IF_NAME_PREFIX = '1.3.6.1.2.1.2.2.1.1.'
 IF_ADMIN_STATUS_PREFIX = '1.3.6.1.2.1.2.3.1.1.'
 IF_OPER_STATUS_PREFIX = '1.3.6.1.2.1.2.3.1.2.'
@@ -83,10 +91,10 @@ MONITORING_RULES = [
     },
     {
         'metric': 'Service state',
-        'oid': 'Lab state service monitor',
+        'oid': f'{LAB_SERVICE_STATE_PREFIX}.<serviceIndex>.0',
         'warning': 'restarting/unknown',
         'critical': 'stopped/failed',
-        'meaning': 'Demo service health for remediation workflows.',
+        'meaning': 'Demo service health exported to SNMP for Zabbix triggers. Value 1 means running.',
     },
 ]
 
@@ -414,6 +422,64 @@ def build_monitoring_summary(devices):
         'critical_count': sum(1 for device in devices if device.get('status') == 'critical'),
         'active_alert_count': len(active_alerts),
     }
+
+
+def upsert_snmprec_values(filename, values, marker_comment=None):
+    filepath = _resolve_device_path(filename)
+    if not filepath or not os.path.exists(filepath):
+        return False
+
+    normalized = []
+    for item in values:
+        oid = item.get('oid')
+        if not oid:
+            continue
+        normalized.append({
+            'oid': str(oid),
+            'type': str(item.get('type', 2)),
+            'value': str(item.get('value', '')),
+        })
+
+    if not normalized:
+        return True
+
+    by_oid = {item['oid']: item for item in normalized}
+
+    with _LOCK:
+        lines = _read_snmprec_lines(filepath)
+        seen = set()
+
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+
+            parts = stripped.split('|')
+            if len(parts) < 3:
+                continue
+
+            oid = parts[0]
+            item = by_oid.get(oid)
+            if not item:
+                continue
+
+            parts[1] = item['type']
+            parts[2] = item['value']
+            lines[index] = '|'.join(parts) + '\n'
+            seen.add(oid)
+
+        missing = [item for item in normalized if item['oid'] not in seen]
+        if missing:
+            if lines and lines[-1].strip():
+                lines.append('\n')
+            if marker_comment:
+                lines.append(f'# {marker_comment}\n')
+            for item in missing:
+                lines.append(f"{item['oid']}|{item['type']}|{item['value']}\n")
+
+        _write_snmprec_lines(filepath, lines)
+
+    return True
 
 
 def update_device(

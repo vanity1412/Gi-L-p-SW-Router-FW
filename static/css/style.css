@@ -347,6 +347,15 @@ code {
     padding: 8px 10px;
 }
 
+.service-oid {
+    display: block;
+    margin-top: 4px;
+    color: #93c5fd;
+    font-size: 0.74rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .icon-action {
     width: 30px;
     height: 30px;

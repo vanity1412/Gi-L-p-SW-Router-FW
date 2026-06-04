@@ -365,9 +365,10 @@ function renderSelectedServices(deviceId) {
             <div>
                 <div class="fw-semibold">${escapeHtml(service.label || service.name)}</div>
                 <div class="text-muted small">${escapeHtml(service.name)}${service.port ? ` :${escapeHtml(service.port)}` : ''}</div>
+                <code class="service-oid">${escapeHtml(service.state_oid || '')}</code>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <span class="badge ${serviceBadgeClass(service.status)}">${escapeHtml(service.status)}</span>
+                <span class="badge ${serviceBadgeClass(service.status)}">${escapeHtml(service.status)} = ${escapeHtml(service.state_value)}</span>
                 <button type="button" class="btn btn-sm btn-outline-danger icon-action" title="Fail service" onclick="updateService('${escapeHtml(deviceId)}', '${escapeHtml(service.name)}', 'failed')">
                     <i class="bi bi-x-octagon"></i>
                 </button>
@@ -396,12 +397,13 @@ function renderServiceList() {
 
     container.innerHTML = rows.map(({ deviceId, deviceName, service }) => `
         <div class="service-row">
-            <div>
-                <div class="fw-semibold text-white">${escapeHtml(service.label || service.name)}</div>
-                <div class="text-muted small">${escapeHtml(deviceName)} / ${escapeHtml(service.name)}${service.port ? ` / port ${escapeHtml(service.port)}` : ''}</div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge ${serviceBadgeClass(service.status)}">${escapeHtml(service.status)}</span>
+                <div>
+                    <div class="fw-semibold text-white">${escapeHtml(service.label || service.name)}</div>
+                    <div class="text-muted small">${escapeHtml(deviceName)} / ${escapeHtml(service.name)}${service.port ? ` / port ${escapeHtml(service.port)}` : ''}</div>
+                    <code class="service-oid">${escapeHtml(service.state_oid || '')}</code>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                <span class="badge ${serviceBadgeClass(service.status)}">${escapeHtml(service.status)} = ${escapeHtml(service.state_value)}</span>
                 <button class="btn btn-sm btn-outline-danger" onclick="updateService('${escapeHtml(deviceId)}', '${escapeHtml(service.name)}', 'failed')">
                     Fail
                 </button>
